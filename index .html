@@ -3,134 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>系統啟動：每日運勢預測</title>
+    <title>硬核五子棋對戰</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #121212;
-            color: #00ffcc;
+            font-family: sans-serif;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             height: 100vh;
             margin: 0;
+            background-color: #2c3e50;
+            color: #ecf0f1;
         }
+
         .container {
-            background-color: #1e1e1e;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
             text-align: center;
-            max-width: 450px;
-            width: 90%;
         }
-        h1 {
-            margin-top: 0;
-            font-size: 24px;
-            letter-spacing: 2px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 15px;
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(15, 30px);
+            grid-template-rows: repeat(15, 30px);
+            gap: 1px;
+            background-color: #d4a373;
+            padding: 10px;
+            border: 3px solid #8b5a2b;
+            margin-bottom: 20px;
         }
-        .result-box {
-            min-height: 140px;
-            margin: 20px 0;
-            padding: 20px;
-            border: 1px solid #333;
-            border-radius: 8px;
-            background-color: #000;
+
+        .cell {
+            width: 30px;
+            height: 30px;
+            background-color: #e3b787;
+            border: 1px solid #c49a6c;
             display: flex;
-            flex-direction: column;
             justify-content: center;
-        }
-        .fortune-level {
-            font-size: 40px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            text-shadow: 0 0 10px currentColor;
-        }
-        .fortune-desc {
-            font-size: 16px;
-            color: #ccc;
-            line-height: 1.5;
-        }
-        button {
-            background-color: #00ffcc;
-            color: #000;
-            border: none;
-            padding: 12px 24px;
-            font-size: 18px;
-            font-weight: bold;
-            border-radius: 5px;
+            align-items: center;
             cursor: pointer;
-            transition: all 0.3s ease;
         }
-        button:hover {
-            background-color: #00b38f;
-            box-shadow: 0 0 15px #00ffcc;
+
+        .piece {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
         }
-        button:disabled {
-            background-color: #555;
-            color: #888;
-            cursor: not-allowed;
-            box-shadow: none;
+
+        .piece.black { background-color: #000; box-shadow: 2px 2px 4px rgba(0,0,0,0.4); }
+        .piece.white { background-color: #fff; box-shadow: 2px 2px 4px rgba(0,0,0,0.4); }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: 0.2s;
         }
+
+        button:hover { background-color: #c0392b; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>[ 系統連線 ] 運勢預測模組</h1>
-        <div class="result-box">
-            <div id="level" class="fortune-level">等待指令...</div>
-            <div id="desc" class="fortune-desc">點擊下方按鈕開始存取運算數據</div>
-        </div>
-        <button id="drawBtn">執行抽取程序</button>
+        <h1>五子棋 Gomoku</h1>
+        <h2 id="status">現在輪到：黑子</h2>
+        <div id="board"></div>
+        <button id="restartBtn">重新開始</button>
     </div>
 
     <script>
-        const fortunes = [
-            { level: "大吉", desc: "宜：單排競技。今天手感發燙，不管打 CS 還是 Valorant，準星就像裝了磁鐵，見神殺神！" },
-            { level: "中吉", desc: "宜：研究硬體。今天是調整雙螢幕支架或保養機械鍵盤（特別是磁軸）的完美時機，手動組裝必定順利。" },
-            { level: "小吉", desc: "宜：掛機看盤。美股 AI 科技股今晚或許會有不錯的波動，適合悠哉觀察，準備佈局。" },
-            { level: "吉", desc: "宜：放鬆追番。寫 Code 或配線弄累了，來看幾集《Smiling Friends》或異世界動畫轉換一下心情。" },
-            { level: "凶", desc: "忌：玩《Stoneshard》不存檔。系統偵測到今天很容易遭遇突發的翻車意外，請步步為營！" },
-            { level: "大凶", desc: "忌：未經測試直接 Push 程式碼。今天很容易遇到邏輯 Bug，上傳前請務必再三檢查！" }
-        ];
+        const boardSize = 15;
+        const boardElement = document.getElementById('board');
+        const statusElement = document.getElementById('status');
+        const restartBtn = document.getElementById('restartBtn');
 
-        const drawBtn = document.getElementById('drawBtn');
-        const levelElement = document.getElementById('level');
-        const descElement = document.getElementById('desc');
+        let currentPlayer = 'black';
+        let board = [];
+        let gameActive = true;
 
-        drawBtn.addEventListener('click', () => {
-            // 按下按鈕後的載入動畫感
-            levelElement.innerText = "運算中...";
-            levelElement.style.color = "#00ffcc";
-            descElement.innerText = "正在分析伺服器數據...";
-            drawBtn.disabled = true;
-            drawBtn.innerText = "請稍候";
+        function initGame() {
+            boardElement.innerHTML = '';
+            board = Array.from({ length: boardSize }, () => Array(boardSize).fill(null));
+            currentPlayer = 'black';
+            gameActive = true;
+            statusElement.innerText = '現在輪到：黑子';
 
-            // 假裝運算 1 秒鐘
-            setTimeout(() => {
-                const randomIndex = Math.floor(Math.random() * fortunes.length);
-                const result = fortunes[randomIndex];
+            for (let r = 0; r < boardSize; r++) {
+                for (let c = 0; c < boardSize; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    cell.addEventListener('click', handleCellClick);
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        function handleCellClick(e) {
+            if (!gameActive) return;
+            const r = parseInt(e.target.dataset.row);
+            const c = parseInt(e.target.dataset.col);
+
+            if (board[r][c] !== null) return;
+
+            board[r][c] = currentPlayer;
+            const piece = document.createElement('div');
+            piece.classList.add('piece', currentPlayer);
+            e.target.appendChild(piece);
+
+            if (checkWin(r, c)) {
+                statusElement.innerText = `${currentPlayer === 'black' ? '黑子' : '白子'} 獲勝！`;
+                gameActive = false;
+                return;
+            }
+
+            currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
+            statusElement.innerText = `現在輪到：${currentPlayer === 'black' ? '黑子' : '白子'}`;
+        }
+
+        function checkWin(r, c) {
+            const directions = [
+                [1, 0], [0, 1], [1, 1], [1, -1]
+            ];
+
+            for (let [dr, dc] of directions) {
+                let count = 1;
                 
-                levelElement.innerText = result.level;
+                // 往前查
+                let nr = r + dr, nc = c + dc;
+                while (nr >= 0 && nr < boardSize && nc >= 0 && nc < boardSize && board[nr][nc] === currentPlayer) {
+                    count++;
+                    nr += dr; nc += dc;
+                }
                 
-                // 根據吉凶改變顏色
-                if(result.level === "大吉" || result.level === "中吉" || result.level === "吉") {
-                    levelElement.style.color = "#ff4757"; // 大吉大利的亮紅色
-                } else if (result.level === "小吉") {
-                    levelElement.style.color = "#ffa502"; // 橘色
-                } else {
-                    levelElement.style.color = "#2ed573"; // 凶兆顯示詭異的綠色
+                // 往後查
+                nr = r - dr; nc = c - dc;
+                while (nr >= 0 && nr < boardSize && nc >= 0 && nc < boardSize && board[nr][nc] === currentPlayer) {
+                    count++;
+                    nr -= dr; nc -= dc;
                 }
 
-                descElement.innerText = result.desc;
-                
-                drawBtn.disabled = false;
-                drawBtn.innerText = "重新抽取";
-            }, 1000);
-        });
+                if (count >= 5) return true;
+            }
+            return false;
+        }
+
+        restartBtn.addEventListener('click', initGame);
+        initGame();
     </script>
 </body>
 </html>
